@@ -1,0 +1,33 @@
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+	<PropertyGroup>
+		<!-- Root of your r2modman profile. Change this to match your local setup. -->
+		<R2ProfileRoot>C:\Users\YOU\AppData\Roaming\r2modmanPlus-local\ScheduleI\profiles\Default</R2ProfileRoot>
+
+		<!-- Derived paths (no need to edit these unless your layout differs) -->
+		<ManagedDllPath>$(R2ProfileRoot)\MelonLoader\Il2CppAssemblies</ManagedDllPath>
+		<MelonLoaderNet6Path>$(R2ProfileRoot)\MelonLoader\net6</MelonLoaderNet6Path>
+		<ModOutputPath>$(R2ProfileRoot)\Mods\ThorHammer-ThorHammer</ModOutputPath>
+
+		<!-- S1API paths (IL2CPP) -->
+		<S1APIModsPath>$(R2ProfileRoot)\Mods\ifBars-S1API_Forked\Mods</S1APIModsPath>
+		<S1APIPluginsPath>$(R2ProfileRoot)\Mods\ifBars-S1API_Forked\Plugins</S1APIPluginsPath>
+		<S1MAPIPath>$(R2ProfileRoot)\Mods\ifbarsp-s1mapi-public\UserLibs</S1MAPIPath>
+
+		<!-- Set to true when building against beta game DLLs -->
+		<BetaBuild>false</BetaBuild>
+
+		<!-- Beta game DLL paths (optional — only needed if BetaBuild is true) -->
+		<BetaIl2CppDllPath>C:\path\to\beta\MelonLoader\Il2CppAssemblies</BetaIl2CppDllPath>
+		<BetaMonoDllPath>C:\path\to\beta\Schedule I_Data\Managed</BetaMonoDllPath>
+
+		<!-- Mono build paths -->
+		<MonoR2ProfileRoot>C:\Users\YOU\AppData\Roaming\r2modmanPlus-local\ScheduleI\profiles\mono-dev</MonoR2ProfileRoot>
+		<MonoManagedDllPath>C:\Program Files (x86)\Steam\steamapps\common\Schedule I\Schedule I_Data\Managed</MonoManagedDllPath>
+		<MonoMelonLoaderPath>$(MonoR2ProfileRoot)\MelonLoader\net35</MonoMelonLoaderPath>
+		<MonoModOutputPath>$(MonoR2ProfileRoot)\Mods\ThorHammer-ThorHammer</MonoModOutputPath>
+
+		<!-- S1API / S1MAPI paths (Mono) -->
+		<MonoS1APIPath>$(MonoR2ProfileRoot)\Mods\ifBars-S1API_Forked\Mods</MonoS1APIPath>
+		<MonoS1MAPIPath>$(MonoR2ProfileRoot)\Mods\ifbarsp-s1mapi-public\UserLibs</MonoS1MAPIPath>
+	</PropertyGroup>
+</Project>
