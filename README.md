@@ -8,7 +8,10 @@ A Schedule I mod that adds Mjolnir (Thor's Hammer) as a purchasable weapon with 
 - **Wind-Up & Throw** — Hold right-click to spin the hammer. Release when fully charged to throw it. The hammer flies forward, hits the first target, then returns to you.
 - **Flight** — While the hammer is fully charged (hold right-click until electrified), press and hold Space to fly in the direction you're looking. Release Space to stop.
 - **Lightning Zap** — Press X (configurable) to shoot lightning from the hammer toward whatever you're aiming at. Damages and electrifies NPCs. Works on any surface.
+- **NPC Panic** — Lightning strikes cause nearby NPCs to panic and flee (configurable radius).
 - **Electrified Effect** — When the hammer is fully charged during wind-up, the player gets an electrified visual effect.
+- **Stamina System** — All hammer actions consume stamina (melee, lightning, wind-up, flight). Fully configurable per-action costs with a toggle to disable.
+- **Live Configuration** — All settings update in real-time via ModsApp or any config editor — no restart required.
 
 ## Controls
 
@@ -55,18 +58,19 @@ Install [OTC Loader](https://www.nexusmods.com/schedule1/mods/1698) (optional, r
 
 ## Configuration
 
-After first launch, a config entry is created in `UserData/MelonPreferences.cfg` under the `[Mjolnir]` section:
+Settings are stored in MelonLoader's config file and organized into the following categories:
 
-```ini
-[Mjolnir]
-LightningKey = X
-```
+* **Controls** — Lightning key binding (any valid [Unity KeyCode](https://docs.unity3d.com/ScriptReference/KeyCode.html) name, e.g. `X`, `F`, `G`, `T`).
+* **Shop** — Price (default $10,000) and a toggle to sell at hardware stores (Handy Hank's, Dan's) in addition to the Arms Dealer.
+* **Combat** — Melee damage/force, throw damage/force, lightning damage/force, and lightning panic radius (NPCs within this radius flee when lightning strikes).
+* **Mechanics** — Flight speed, throw speed, max throw range, and wind-up duration (minimum 0.1s).
+* **Stamina** — Enable/disable toggle for stamina consumption, plus per-action costs: swing cost, lightning cost, wind-up drain rate, and flight drain rate.
 
-Change the value to any valid [Unity KeyCode](https://docs.unity3d.com/ScriptReference/KeyCode.html) name (e.g. `F`, `G`, `T`).
+Every setting includes a full description visible in ModsApp by k0mods [Thunderstore](https://thunderstore.io/c/schedule-i/p/k0Mods/ModsApp/)/[Nexus](https://www.nexusmods.com/schedule1/mods/1222) (recommended, open-source, recently updated). Also compatible with other config editors. You can always edit the config file directly if you prefer.
 
 ## In-Game
 
-Mjolnir can be purchased from **Handy Hank's Hardware** or **Dan's Hardware** for $500.
+Mjolnir can be purchased from the **Arms Dealer** for $10,000. Optionally, it can also be sold at **Handy Hank's Hardware** and **Dan's Hardware** (disabled by default — enable in config).
 
 ## Credits
 

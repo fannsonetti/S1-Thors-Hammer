@@ -6,6 +6,7 @@ using Il2CppScheduleOne.Effects;
 using Il2CppScheduleOne.Equipping;
 using Il2CppScheduleOne.FX;
 using Il2CppScheduleOne.ItemFramework;
+using Il2CppScheduleOne.Noise;
 using Il2CppScheduleOne.NPCs;
 using Il2CppScheduleOne.PlayerScripts;
 using Il2CppScheduleOne.Vision;
@@ -19,6 +20,7 @@ using ScheduleOne.Effects;
 using ScheduleOne.Equipping;
 using ScheduleOne.FX;
 using ScheduleOne.ItemFramework;
+using ScheduleOne.Noise;
 using ScheduleOne.NPCs;
 using ScheduleOne.PlayerScripts;
 using ScheduleOne.Vision;
@@ -43,38 +45,27 @@ public class HammerEquippable : Equippable_Viewmodel
     // ── Melee stats ──
     private const float Range = 1.5f;
     private const float HitRadius = 0.3f;
-    private const float MeleeDamage = 25f;
-    private const float MinForce = 200f;
-    private const float MaxForce = 500f;
     private const float SwingCooldown = 0.25f;
     private const float SwingDuration = 0.15f;
     private const float SwingAngle = 70f;
     private const float HitTime = 0.06f;
 
     // ── Wind-up (right-click hold) ──
-    private const float WindUpDuration = 1.2f;
     private const float WindUpMaxSpinSpeed = 5400f;
     private const float AimFOVReduction = 15f;
     private const float AimZoomDuration = 0.2f;
 
     // ── Lightning zap ──
-    private const float LightningRange = MaxThrowRange * 0.7f;
+    private static float LightningRange => Core.MaxThrowRange * 0.7f;
     private const float LightningAimRadius = 0.5f;
-    private const float LightningDamage = 80f;
-    private const float LightningForce = 400f;
     private const int LightningBoltCount = 12;
     private const float LightningBoltInterval = 0.08f;
 
     // ── Flight ──
-    private const float FlightSpeed = 18f;
     private const float FlightGracePeriod = 0.5f;
 
     // ── Throw ──
-    private const float ThrowSpeed = 40f;
-    private const float MaxThrowRange = 30f;
     private const float ThrowHitRadius = 0.3f;
-    private const float ThrowDamage = 100f;
-    private const float ThrowForce = 600f;
     private const float ReturnSpeed = 45f;
     private const float ReturnCatchDistance = 0.5f;
     private const float SpinSpeed = 1440f;
@@ -250,6 +241,11 @@ public class HammerEquippable : Equippable_Viewmodel
         // Lightning zap (configurable key, default X)
         if (canInteract && Input.GetKeyDown(Core.LightningKey))
         {
+            if (Core.StaminaEnabled &&
+                PlayerSingleton<PlayerMovement>.Instance.CurrentStaminaReserve < Core.LightningStaminaCost)
+                return;
+            if (Core.StaminaEnabled)
+                PlayerSingleton<PlayerMovement>.Instance.ChangeStamina(-Core.LightningStaminaCost);
             TryLightningZap();
         }
 
@@ -257,6 +253,11 @@ public class HammerEquippable : Equippable_Viewmodel
         if (canInteract && !_isSwinging && _cooldownRemaining <= 0f &&
             GameInput.GetButtonDown(GameInput.ButtonCode.PrimaryClick))
         {
+            if (Core.StaminaEnabled &&
+                PlayerSingleton<PlayerMovement>.Instance.CurrentStaminaReserve < Core.SwingStaminaCost)
+                return;
+            if (Core.StaminaEnabled)
+                PlayerSingleton<PlayerMovement>.Instance.ChangeStamina(-Core.SwingStaminaCost);
             StartSwing();
         }
     }
@@ -312,12 +313,12 @@ public class HammerEquippable : Equippable_Viewmodel
         if (damageable == null)
             return;
 
-        float force = UnityEngine.Random.Range(MinForce, MaxForce);
+        float force = Core.MeleeForce;
 
         var impact = new Impact(
             hit.point,
             PlayerSingleton<PlayerCamera>.Instance.transform.forward,
-            force, MeleeDamage,
+            force, Core.MeleeDamage,
             EImpactType.BluntMetal,
             Player.Local.NetworkObject,
             UnityEngine.Random.Range(int.MinValue, int.MaxValue));
@@ -357,10 +358,21 @@ public class HammerEquippable : Equippable_Viewmodel
     private void UpdateWindUp()
     {
         _windUpElapsed += Time.deltaTime;
-        bool charged = _windUpElapsed >= WindUpDuration;
+        bool charged = _windUpElapsed >= Core.WindUpDuration;
+
+        // Stamina drain during wind-up
+        if (Core.StaminaEnabled)
+        {
+            PlayerSingleton<PlayerMovement>.Instance.ChangeStamina(-Core.WindUpStaminaRate * Time.deltaTime);
+            if (PlayerSingleton<PlayerMovement>.Instance.CurrentStaminaReserve <= 0f)
+            {
+                CancelWindUp();
+                return;
+            }
+        }
 
         // Accelerating spin
-        float t = Mathf.Clamp01(_windUpElapsed / WindUpDuration);
+        float t = Mathf.Clamp01(_windUpElapsed / Core.WindUpDuration);
         float spinSpeed = t * t * WindUpMaxSpinSpeed;
         if (_hammerModel != null)
             _hammerModel.transform.Rotate(Vector3.forward, spinSpeed * Time.deltaTime, Space.Self);
@@ -459,7 +471,7 @@ public class HammerEquippable : Equippable_Viewmodel
             return;
         }
 
-        float step = ThrowSpeed * Time.deltaTime;
+        float step = Core.ThrowSpeed * Time.deltaTime;
         _throwDistance += step;
 
         _projectile.transform.position += _throwDirection * step;
@@ -479,7 +491,7 @@ public class HammerEquippable : Equippable_Viewmodel
             return;
         }
 
-        if (_throwDistance >= MaxThrowRange)
+        if (_throwDistance >= Core.MaxThrowRange)
         {
             _state = HammerState.FlyingBack;
         }
@@ -514,7 +526,7 @@ public class HammerEquippable : Equippable_Viewmodel
             var impact = new Impact(
                 hit.point,
                 _throwDirection,
-                ThrowForce, ThrowDamage,
+                Core.ThrowForce, Core.ThrowDamage,
                 EImpactType.BluntMetal,
                 Player.Local.NetworkObject,
                 UnityEngine.Random.Range(int.MinValue, int.MaxValue));
@@ -600,7 +612,7 @@ public class HammerEquippable : Equippable_Viewmodel
                     var impact = new Impact(
                         hit.point,
                         cam.transform.forward,
-                        LightningForce, LightningDamage,
+                        Core.LightningForce, Core.LightningDamage,
                         EImpactType.BluntMetal,
                         Player.Local.NetworkObject,
                         UnityEngine.Random.Range(int.MinValue, int.MaxValue));
@@ -617,6 +629,7 @@ public class HammerEquippable : Equippable_Viewmodel
 
         MelonCoroutines.Start(LightningHelper.BurstCoroutine(targetPoint, npc, hammerTip, LightningBoltCount, LightningBoltInterval));
         PlayThunderSound(targetPoint);
+        EmitLightningNoise(targetPoint);
         Player.Local.VisualState.ApplyState("melee_attack", EVisualState.Brandishing, 2.5f);
         PlayerSingleton<PlayerCamera>.Instance.StartCameraShake(0.5f, 0.3f);
     }
@@ -628,6 +641,13 @@ public class HammerEquippable : Equippable_Viewmodel
         MelonCoroutines.Start(LightningHelper.BurstCoroutine(position, npc, position + Vector3.up * 80f, LightningBoltCount, LightningBoltInterval));
         Electrifying.ApplyToAvatar(npc.Avatar);
         PlayThunderSound(position);
+        EmitLightningNoise(position);
+    }
+
+    private static void EmitLightningNoise(Vector3 position)
+    {
+        if (Core.LightningPanicRadius > 0f)
+            NoiseUtility.EmitNoise(position, ENoiseType.Explosion, Core.LightningPanicRadius, Player.Local.gameObject);
     }
 
     private void PlayThunderSound(Vector3 position)
@@ -727,7 +747,18 @@ public class HammerEquippable : Equippable_Viewmodel
         var cam = PlayerSingleton<PlayerCamera>.Instance.transform;
         var pm = PlayerSingleton<PlayerMovement>.Instance;
 
-        pm.Controller.Move(cam.forward * FlightSpeed * Time.deltaTime);
+        // Stamina drain during flight
+        if (Core.StaminaEnabled)
+        {
+            pm.ChangeStamina(-Core.FlightStaminaRate * Time.deltaTime);
+            if (pm.CurrentStaminaReserve <= 0f)
+            {
+                StopFlight();
+                return;
+            }
+        }
+
+        pm.Controller.Move(cam.forward * Core.FlightSpeed * Time.deltaTime);
 
         // Grace period before checking IsGrounded so we don't stop immediately
         bool graceExpired = Time.time - _flightStartTime > FlightGracePeriod;

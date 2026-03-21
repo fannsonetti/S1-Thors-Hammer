@@ -18,27 +18,84 @@ using S1MAPI.Gltf;
 using S1MAPI.Utils;
 using UnityEngine;
 
-[assembly: MelonInfo(typeof(ThorHammer.Core), "Mjolnir", "1.0.1", "hdlmrell", null)]
+[assembly: MelonInfo(typeof(ThorHammer.Core), "Mjolnir", "1.0.2", "hdlmrell", null)]
 [assembly: MelonGame("TVGS", "Schedule I")]
 
 namespace ThorHammer;
 
 public class Core : MelonMod
 {
-    private static readonly string[] HardwareShopNames =
-        { "Handy Hank's Hardware", "Dan's Hardware" };
-
     private bool _itemsRegistered;
     private bool _loadHooked;
     private static ItemDefinition _hammerDef;
     private static Sprite _cachedIcon;
 
-    // Config
-    private static MelonPreferences_Entry<string> _lightningKeyEntry;
-    /// <summary>
-    /// The configured key for summoning lightning from the hammer.
-    /// </summary>
+    private static readonly string[] HardwareShopNames =
+        { "Handy Hank's Hardware", "Dan's Hardware" };
+
+    // Config entries
+    private static MelonPreferences_Entry<float> _priceEntry;
+    private static MelonPreferences_Entry<bool> _sellAtHardwareEntry;
+    private static bool _shopsPopulated;
+
+    // ── Controls ──
+
+    /// <summary>The configured key for summoning lightning from the hammer.</summary>
     public static KeyCode LightningKey { get; private set; } = KeyCode.X;
+
+    // ── Combat ──
+
+    /// <summary>Damage dealt by a melee swing.</summary>
+    public static float MeleeDamage { get; private set; } = 25f;
+
+    /// <summary>Impact force of a melee swing.</summary>
+    public static float MeleeForce { get; private set; } = 350f;
+
+    /// <summary>Damage dealt when the thrown hammer hits.</summary>
+    public static float ThrowDamage { get; private set; } = 100f;
+
+    /// <summary>Impact force of the thrown hammer.</summary>
+    public static float ThrowForce { get; private set; } = 600f;
+
+    /// <summary>Damage dealt by a lightning zap.</summary>
+    public static float LightningDamage { get; private set; } = 80f;
+
+    /// <summary>Impact force of a lightning zap.</summary>
+    public static float LightningForce { get; private set; } = 400f;
+
+    /// <summary>Radius around lightning strikes that causes nearby NPCs to panic (0 to disable).</summary>
+    public static float LightningPanicRadius { get; private set; } = 25f;
+
+    // ── Mechanics ──
+
+    /// <summary>How fast the player flies while holding Space during a charged wind-up.</summary>
+    public static float FlightSpeed { get; private set; } = 18f;
+
+    /// <summary>How fast the thrown hammer travels.</summary>
+    public static float ThrowSpeed { get; private set; } = 40f;
+
+    /// <summary>Maximum distance the hammer can travel before returning.</summary>
+    public static float MaxThrowRange { get; private set; } = 30f;
+
+    /// <summary>Seconds to fully charge the hammer spin (minimum 0.1).</summary>
+    public static float WindUpDuration { get; private set; } = 1.2f;
+
+    // ── Stamina ──
+
+    /// <summary>Whether hammer actions consume stamina.</summary>
+    public static bool StaminaEnabled { get; private set; } = true;
+
+    /// <summary>Stamina consumed per melee swing.</summary>
+    public static float SwingStaminaCost { get; private set; } = 15f;
+
+    /// <summary>Stamina consumed per lightning zap.</summary>
+    public static float LightningStaminaCost { get; private set; } = 20f;
+
+    /// <summary>Stamina consumed per second while winding up.</summary>
+    public static float WindUpStaminaRate { get; private set; } = 20f;
+
+    /// <summary>Stamina consumed per second while flying.</summary>
+    public static float FlightStaminaRate { get; private set; } = 15f;
 
     private static string IconPath =>
         Path.Combine(MelonEnvironment.UserDataDirectory, "S1API", "Icons", "ThorHammer.png");
@@ -50,14 +107,70 @@ public class Core : MelonMod
         ClassInjector.RegisterTypeInIl2Cpp<HammerEquippable>();
 #endif
 
-        var config = MelonPreferences.CreateCategory("Mjolnir", "Mjolnir Settings");
-        _lightningKeyEntry = config.CreateEntry("LightningKey", "X", "Lightning Key",
-            "Key to summon lightning from the hammer (e.g. X, F, G, T)");
+        // ── Controls ──
+        var controls = MelonPreferences.CreateCategory("Mjolnir - Controls", "Mjolnir Controls");
+        var savedKey = BindEntry(controls, "LightningKey", "X", "Lightning Key",
+            "Key to summon lightning from the hammer (e.g. X, F, G, T)",
+            (_, v) =>
+            {
+                if (Enum.TryParse<KeyCode>(v, true, out var k)) LightningKey = k;
+                else LoggerInstance.Warning($"Invalid lightning key '{v}', keeping {LightningKey}");
+            });
+        if (Enum.TryParse<KeyCode>(savedKey, true, out var initial)) LightningKey = initial;
+        else LoggerInstance.Warning($"Invalid lightning key '{savedKey}', defaulting to X");
 
-        if (Enum.TryParse<KeyCode>(_lightningKeyEntry.Value, true, out var key))
-            LightningKey = key;
-        else
-            LoggerInstance.Warning($"Invalid lightning key '{_lightningKeyEntry.Value}', defaulting to X");
+        // ── Shop ──
+        var shop = MelonPreferences.CreateCategory("Mjolnir - Shop", "Mjolnir Shop");
+        _priceEntry = shop.CreateEntry("Price", 10000f, "Shop Price",
+            "Price of Mjolnir at the Arms Dealer (in dollars)");
+        _priceEntry.OnEntryValueChanged.Subscribe((_, v) => OnPriceChanged(v));
+        _sellAtHardwareEntry = shop.CreateEntry("SellAtHardwareStores", false,
+            "Sell at Hardware Stores",
+            "Whether Mjolnir is also sold at hardware stores (Handy Hank's, Dan's)");
+        _sellAtHardwareEntry.OnEntryValueChanged.Subscribe((_, v) => OnHardwareShopToggled(v));
+
+        // ── Combat ──
+        var combat = MelonPreferences.CreateCategory("Mjolnir - Combat", "Mjolnir Combat");
+        MeleeDamage = BindEntry(combat, "MeleeDamage", 25f, "Melee Damage",
+            "Damage dealt by a melee swing", (_, v) => MeleeDamage = v);
+        MeleeForce = BindEntry(combat, "MeleeForce", 350f, "Melee Force",
+            "Impact force of a melee swing", (_, v) => MeleeForce = v);
+        ThrowDamage = BindEntry(combat, "ThrowDamage", 100f, "Throw Damage",
+            "Damage dealt when the thrown hammer hits", (_, v) => ThrowDamage = v);
+        ThrowForce = BindEntry(combat, "ThrowForce", 600f, "Throw Force",
+            "Impact force of the thrown hammer", (_, v) => ThrowForce = v);
+        LightningDamage = BindEntry(combat, "LightningDamage", 80f, "Lightning Damage",
+            "Damage dealt by a lightning zap", (_, v) => LightningDamage = v);
+        LightningForce = BindEntry(combat, "LightningForce", 400f, "Lightning Force",
+            "Impact force of a lightning zap", (_, v) => LightningForce = v);
+        LightningPanicRadius = BindEntry(combat, "LightningPanicRadius", 25f, "Lightning Panic Radius",
+            "Radius around lightning strikes that causes nearby NPCs to panic (0 to disable)",
+            (_, v) => LightningPanicRadius = v);
+
+        // ── Mechanics ──
+        var mechanics = MelonPreferences.CreateCategory("Mjolnir - Mechanics", "Mjolnir Mechanics");
+        FlightSpeed = BindEntry(mechanics, "FlightSpeed", 18f, "Flight Speed",
+            "How fast you fly while holding Space during a charged wind-up", (_, v) => FlightSpeed = v);
+        ThrowSpeed = BindEntry(mechanics, "ThrowSpeed", 40f, "Throw Speed",
+            "How fast the thrown hammer travels", (_, v) => ThrowSpeed = v);
+        MaxThrowRange = BindEntry(mechanics, "MaxThrowRange", 30f, "Max Throw Range",
+            "Maximum distance the hammer can travel before returning", (_, v) => MaxThrowRange = v);
+        WindUpDuration = Math.Max(0.1f, BindEntry(mechanics, "WindUpDuration", 1.2f, "Wind-Up Duration",
+            "Seconds to fully charge the hammer spin (minimum 0.1)",
+            (_, v) => WindUpDuration = Math.Max(0.1f, v)));
+
+        // ── Stamina ──
+        var stamina = MelonPreferences.CreateCategory("Mjolnir - Stamina", "Mjolnir Stamina");
+        StaminaEnabled = BindEntry(stamina, "StaminaEnabled", true, "Stamina Enabled",
+            "Whether hammer actions consume stamina", (_, v) => StaminaEnabled = v);
+        SwingStaminaCost = BindEntry(stamina, "SwingStaminaCost", 15f, "Swing Stamina Cost",
+            "Stamina consumed per melee swing", (_, v) => SwingStaminaCost = v);
+        LightningStaminaCost = BindEntry(stamina, "LightningStaminaCost", 20f, "Lightning Stamina Cost",
+            "Stamina consumed per lightning zap", (_, v) => LightningStaminaCost = v);
+        WindUpStaminaRate = BindEntry(stamina, "WindUpStaminaRate", 20f, "Wind-Up Stamina Rate",
+            "Stamina consumed per second while winding up", (_, v) => WindUpStaminaRate = v);
+        FlightStaminaRate = BindEntry(stamina, "FlightStaminaRate", 15f, "Flight Stamina Rate",
+            "Stamina consumed per second while flying", (_, v) => FlightStaminaRate = v);
 
         LoggerInstance.Msg("Initialized.");
     }
@@ -114,7 +227,7 @@ public class Core : MelonMod
                 description: "Mjolnir. Whosoever holds this hammer, if they be worthy, shall possess the power of Thor.",
                 category: ItemCategory.Tools)
             .WithStackLimit(1)
-            .WithPricing(500f, 0.5f)
+            .WithPricing(_priceEntry.Value, 0.5f)
             .WithLegalStatus(LegalStatus.Legal)
             .WithEquippable(equippable)
             .Build();
@@ -277,7 +390,58 @@ public class Core : MelonMod
     {
         if (_hammerDef == null) return;
 
-        int added = ShopManager.AddToShops(_hammerDef, HardwareShopNames);
-        LoggerInstance.Msg($"Mjolnir added to {added} hardware store(s).");
+        int added = ShopManager.AddToShops(_hammerDef, "Arms Dealer");
+        if (_sellAtHardwareEntry.Value)
+            added += ShopManager.AddToShops(_hammerDef, HardwareShopNames);
+
+        _shopsPopulated = true;
+        LoggerInstance.Msg($"Mjolnir added to {added} shop(s).");
+    }
+
+    private void OnPriceChanged(float newPrice)
+    {
+        if (!_shopsPopulated || _hammerDef == null) return;
+
+        if (_hammerDef is StorableItemDefinition storable)
+            storable.BasePurchasePrice = newPrice;
+
+        // Remove and re-add to all shops so the listing picks up the new price
+        var shops = ShopManager.FindShopsByItem("thor_hammer");
+        foreach (var s in shops)
+        {
+            s.RemoveItem("thor_hammer");
+            s.AddItem(_hammerDef, newPrice);
+        }
+        LoggerInstance.Msg($"Mjolnir price updated to ${newPrice:N0}.");
+    }
+
+    private void OnHardwareShopToggled(bool enabled)
+    {
+        if (!_shopsPopulated || _hammerDef == null) return;
+
+        if (enabled)
+        {
+            int added = ShopManager.AddToShops(_hammerDef, HardwareShopNames);
+            LoggerInstance.Msg($"Mjolnir added to {added} hardware shop(s).");
+        }
+        else
+        {
+            foreach (var name in HardwareShopNames)
+            {
+                var s = ShopManager.GetShopByName(name);
+                if (s != null && s.HasItem("thor_hammer"))
+                    s.RemoveItem("thor_hammer");
+            }
+            LoggerInstance.Msg("Mjolnir removed from hardware shops.");
+        }
+    }
+
+    /// <summary>Creates a config entry with a live-update callback. Returns the initial value.</summary>
+    private static T BindEntry<T>(MelonPreferences_Category cat, string id, T defaultValue,
+        string displayName, string description, LemonAction<T, T> onChanged)
+    {
+        var entry = cat.CreateEntry(id, defaultValue, displayName, description);
+        entry.OnEntryValueChanged.Subscribe(onChanged);
+        return entry.Value;
     }
 }

@@ -22,6 +22,14 @@ nexusmods/
 package.py
 package.bat
 build-both.sh
+tools/
+_stage_*/
+*.zip
+
+# Generated platform descriptions
+NEXUS_BBCODE.txt
+NEXUS_DESCRIPTION.txt
+DISCORD.md
 
 # OS
 Thumbs.db

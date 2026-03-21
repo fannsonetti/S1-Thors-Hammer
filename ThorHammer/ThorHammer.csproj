@@ -8,8 +8,8 @@
 		<RootNamespace>ThorHammer</RootNamespace>
 		<LangVersion>latest</LangVersion>
 		<IsPackable>false</IsPackable>
-		<AssemblyVersion>1.0.0.0</AssemblyVersion>
-		<FileVersion>1.0.0.0</FileVersion>
+		<AssemblyVersion>1.0.2.0</AssemblyVersion>
+		<FileVersion>1.0.2.0</FileVersion>
 		<NeutralLanguage>en-US</NeutralLanguage>
 		<AssemblyName>ThorHammer</AssemblyName> <!-- overridden per-config below -->
 		<AllowUnsafeBlocks>True</AllowUnsafeBlocks>
@@ -157,9 +157,7 @@
 		<Reference Include="Il2CppCinemachine"><HintPath>$(GameDllPath)\Il2CppCinemachine.dll</HintPath></Reference>
 		<Reference Include="Il2Cppcom.rlabrecque.steamworks.net"><HintPath>$(GameDllPath)\Il2Cppcom.rlabrecque.steamworks.net.dll</HintPath></Reference>
 		<Reference Include="Il2CppCorgiGodRays"><HintPath>$(GameDllPath)\Il2CppCorgiGodRays.dll</HintPath></Reference>
-		<Reference Include="Il2CppEasyButtons"><HintPath>$(GameDllPath)\Il2CppEasyButtons.dll</HintPath></Reference>
 		<Reference Include="Il2CppEdgegap"><HintPath>$(GameDllPath)\Il2CppEdgegap.dll</HintPath></Reference>
-		<Reference Include="Il2CppFishNet.Demos"><HintPath>$(GameDllPath)\Il2CppFishNet.Demos.dll</HintPath></Reference>
 		<Reference Include="Il2CppFishNet.Runtime"><HintPath>$(GameDllPath)\Il2CppFishNet.Runtime.dll</HintPath></Reference>
 		<Reference Include="Il2CppGameKit.Dependencies"><HintPath>$(GameDllPath)\Il2CppGameKit.Dependencies.dll</HintPath></Reference>
 		<Reference Include="Il2CppGameKit.Utilities"><HintPath>$(GameDllPath)\Il2CppGameKit.Utilities.dll</HintPath></Reference>
@@ -220,9 +218,7 @@
 		<Reference Include="Cinemachine"><HintPath>$(GameDllPath)\Cinemachine.dll</HintPath></Reference>
 		<Reference Include="com.rlabrecque.steamworks.net"><HintPath>$(GameDllPath)\com.rlabrecque.steamworks.net.dll</HintPath></Reference>
 		<Reference Include="CorgiGodRays"><HintPath>$(GameDllPath)\CorgiGodRays.dll</HintPath></Reference>
-		<Reference Include="EasyButtons"><HintPath>$(GameDllPath)\EasyButtons.dll</HintPath></Reference>
 		<Reference Include="Edgegap"><HintPath>$(GameDllPath)\Edgegap.dll</HintPath></Reference>
-		<Reference Include="FishNet.Demos"><HintPath>$(GameDllPath)\FishNet.Demos.dll</HintPath></Reference>
 		<Reference Include="FishNet.Runtime"><HintPath>$(GameDllPath)\FishNet.Runtime.dll</HintPath></Reference>
 		<Reference Include="GameKit.Dependencies"><HintPath>$(GameDllPath)\GameKit.Dependencies.dll</HintPath></Reference>
 		<Reference Include="GameKit.Utilities"><HintPath>$(GameDllPath)\GameKit.Utilities.dll</HintPath></Reference>
