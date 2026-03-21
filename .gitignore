@@ -1,0 +1,29 @@
+# Build output
+[Bb]in/
+[Oo]bj/
+
+# Visual Studio
+.vs/
+*.user
+*.suo
+
+# Build logs
+build.log
+
+# Local paths (machine-specific)
+ThorHammer/LocalPaths.targets
+
+# MCP config (local dev tooling)
+.mcp.json
+
+# Packaging / distribution
+thunderstore/
+nexusmods/
+package.py
+package.bat
+build-both.sh
+
+# OS
+Thumbs.db
+Desktop.ini
+.DS_Store
