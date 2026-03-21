@@ -172,7 +172,6 @@
 		<Reference Include="Il2CppMono.Posix"><HintPath>$(GameDllPath)\Il2CppMono.Posix.dll</HintPath></Reference>
 		<Reference Include="Il2CppMono.Security"><HintPath>$(GameDllPath)\Il2CppMono.Security.dll</HintPath></Reference>
 		<Reference Include="Il2Cppmscorlib"><HintPath>$(GameDllPath)\Il2Cppmscorlib.dll</HintPath></Reference>
-		<Reference Include="Il2CppNewtonsoft.Json"><HintPath>$(GameDllPath)\Il2CppNewtonsoft.Json.dll</HintPath></Reference>
 		<Reference Include="Il2CppOokii.Dialogs"><HintPath>$(GameDllPath)\Il2CppOokii.Dialogs.dll</HintPath></Reference>
 		<Reference Include="Il2CppPathfinding.ClipperLib"><HintPath>$(GameDllPath)\Il2CppPathfinding.ClipperLib.dll</HintPath></Reference>
 		<Reference Include="Il2CppPathfinding.Ionic.Zip.Reduced"><HintPath>$(GameDllPath)\Il2CppPathfinding.Ionic.Zip.Reduced.dll</HintPath></Reference>
@@ -207,7 +206,7 @@
 		<Reference Include="Il2CppScheduleOne.Core"><HintPath>$(GameDllPath)\Il2CppScheduleOne.Core.dll</HintPath></Reference>
 		<Reference Include="S1API"><HintPath>$(S1APIModsPath)\S1API.Il2Cpp.MelonLoader.dll</HintPath></Reference>
 		<Reference Include="S1APILoader"><HintPath>$(S1APIPluginsPath)\S1APILoader.MelonLoader.dll</HintPath></Reference>
-		<Reference Include="S1MAPI"><HintPath>$(S1MAPIPath)\S1MAPI.dll</HintPath></Reference>
+		<Reference Include="S1MAPI"><HintPath>$(S1MAPIPath)\S1MAPI_Il2Cpp.dll</HintPath></Reference>
 	</ItemGroup>
 
 	<!-- Mono-only references -->
@@ -233,7 +232,6 @@
 		<Reference Include="HBAO.Universal.Runtime"><HintPath>$(GameDllPath)\HBAO.Universal.Runtime.dll</HintPath></Reference>
 		<Reference Include="HSVPicker"><HintPath>$(GameDllPath)\HSVPicker.dll</HintPath></Reference>
 		<Reference Include="LokoSolo.PinchableScrollRect"><HintPath>$(GameDllPath)\LokoSolo.PinchableScrollRect.dll</HintPath></Reference>
-		<Reference Include="Newtonsoft.Json"><HintPath>$(GameDllPath)\Newtonsoft.Json.dll</HintPath></Reference>
 		<Reference Include="Ookii.Dialogs"><HintPath>$(GameDllPath)\Ookii.Dialogs.dll</HintPath></Reference>
 		<Reference Include="Pathfinding.ClipperLib"><HintPath>$(GameDllPath)\Pathfinding.ClipperLib.dll</HintPath></Reference>
 		<Reference Include="Pathfinding.Ionic.Zip.Reduced"><HintPath>$(GameDllPath)\Pathfinding.Ionic.Zip.Reduced.dll</HintPath></Reference>
@@ -249,7 +247,7 @@
 		<Reference Include="VisualDesignCafe.ShaderX"><HintPath>$(GameDllPath)\VisualDesignCafe.ShaderX.dll</HintPath></Reference>
 		<Reference Include="ScheduleOne.Core"><HintPath>$(GameDllPath)\ScheduleOne.Core.dll</HintPath></Reference>
 		<Reference Include="S1API"><HintPath>$(MonoS1APIPath)\S1API.Mono.MelonLoader.dll</HintPath></Reference>
-		<Reference Include="S1MAPI"><HintPath>$(MonoS1MAPIPath)\S1MAPI.dll</HintPath></Reference>
+		<Reference Include="S1MAPI"><HintPath>$(MonoS1MAPIPath)\S1MAPI_Mono.dll</HintPath></Reference>
 	</ItemGroup>
 
 	<!-- Post-build: copy DLL to mod output folder (non-fatal if path missing) -->

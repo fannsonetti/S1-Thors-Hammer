@@ -32,6 +32,7 @@ Install [OTC Loader](https://www.nexusmods.com/schedule1/mods/1698) (optional, r
 
 - [MelonLoader 0.7.2+](https://github.com/LavaGang/MelonLoader)
 - [S1API Forked 1.3.0+](https://thunderstore.io/c/schedule-i/p/ifBars/S1API_Forked/) ([NexusMods](https://www.nexusmods.com/schedule1/mods/1194))
+- [S1MAPI 1.0.0+](https://thunderstore.io/c/schedule-i/p/ifBars/S1MAPI/) ([NexusMods](https://www.nexusmods.com/schedule1/mods/1447))
 - [OTC Loader](https://www.nexusmods.com/schedule1/mods/1698) (optional, recommended) — auto-detects your game branch and disables incompatible DLLs
 
 ### Using a mod manager (recommended)
@@ -44,7 +45,7 @@ Install [OTC Loader](https://www.nexusmods.com/schedule1/mods/1698) (optional, r
 ### Manual installation
 
 1. Install **MelonLoader 0.7.2+** on your Schedule I game.
-2. Install **S1API Forked** into your `Mods` folder. Make sure to pick the version matching your game branch (IL2CPP or Mono).
+2. Install **S1API Forked** and **S1MAPI** into your `Mods` folder. Make sure to pick the versions matching your game branch (IL2CPP or Mono).
 3. Download the latest Mjolnir release. It includes two files:
    - `ThorHammer.Il2Cpp.dll` — for the IL2CPP branch (Steam default)
    - `ThorHammer.Mono.dll` — for the Mono branch

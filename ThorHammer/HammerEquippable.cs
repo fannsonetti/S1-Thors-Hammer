@@ -30,7 +30,6 @@ using UnityEngine;
 using UnityEngine.Rendering;
 using S1MAPI.Gltf;
 using S1MAPI.Utils;
-using System.Collections;
 using System.Reflection;
 
 namespace ThorHammer;
@@ -123,7 +122,31 @@ public class HammerEquippable : Equippable_Viewmodel
 
         LoadHammerModel();
 
+#if IL2CPP
+        // Inline base.Equip() — IL2CPP wrappers use il2cpp_object_get_virtual_method
+        // which dispatches back to this override, causing infinite recursion.
+
+        // Equippable.Equip:
+        itemInstance = item;
+        PlayerSingleton<PlayerInventory>.Instance.SetEquippable(this);
+        PlayerSingleton<PlayerInventory>.Instance.EquippedSlotChanged();
+
+        // Equippable_Viewmodel.Equip (continued):
+        transform.localPosition = localPosition;
+        transform.localEulerAngles = localEulerAngles;
+        transform.localScale = localScale;
+        LayerUtility.SetLayerRecursively(gameObject, LayerMask.NameToLayer("Viewmodel"));
+        var renderers = gameObject.GetComponentsInChildren<MeshRenderer>(true);
+        foreach (var mr in renderers)
+        {
+            if (mr.shadowCastingMode == ShadowCastingMode.ShadowsOnly)
+                mr.enabled = false;
+            else
+                mr.shadowCastingMode = ShadowCastingMode.Off;
+        }
+#else
         base.Equip(item);
+#endif
     }
 
     /// <inheritdoc />
@@ -135,7 +158,16 @@ public class HammerEquippable : Equippable_Viewmodel
             CancelWindUp();
         CleanupThrow();
         ClearPlayerCharged();
+
+#if IL2CPP
+        // Inline base.Unequip() — same virtual dispatch recursion issue.
+        // Equippable.Unequip:
+        PlayerSingleton<PlayerInventory>.Instance.SetEquippable(null);
+        PlayerSingleton<PlayerInventory>.Instance.EquippedSlotChanged();
+        UnityEngine.Object.Destroy(gameObject);
+#else
         base.Unequip();
+#endif
     }
 
     private void LoadHammerModel()
@@ -171,7 +203,9 @@ public class HammerEquippable : Equippable_Viewmodel
 #endif
     override void Update()
     {
-        base.Update();
+#if !IL2CPP
+        base.Update(); // IL2CPP: skipped — base is empty and virtual dispatch would recurse
+#endif
 
         if (_cooldownRemaining > 0f)
             _cooldownRemaining -= Time.deltaTime;
@@ -581,7 +615,7 @@ public class HammerEquippable : Equippable_Viewmodel
             targetPoint = cam.transform.position + cam.transform.forward * LightningRange;
         }
 
-        MelonCoroutines.Start(LightningBurstCoroutine(targetPoint, npc, hammerTip));
+        MelonCoroutines.Start(LightningHelper.BurstCoroutine(targetPoint, npc, hammerTip, LightningBoltCount, LightningBoltInterval));
         PlayThunderSound(targetPoint);
         Player.Local.VisualState.ApplyState("melee_attack", EVisualState.Brandishing, 2.5f);
         PlayerSingleton<PlayerCamera>.Instance.StartCameraShake(0.5f, 0.3f);
@@ -591,59 +625,9 @@ public class HammerEquippable : Equippable_Viewmodel
     private void StrikeLightningOnNPC(NPC npc)
     {
         Vector3 position = npc.transform.position;
-        MelonCoroutines.Start(LightningBurstCoroutine(position, npc, position + Vector3.up * 80f));
+        MelonCoroutines.Start(LightningHelper.BurstCoroutine(position, npc, position + Vector3.up * 80f, LightningBoltCount, LightningBoltInterval));
         Electrifying.ApplyToAvatar(npc.Avatar);
         PlayThunderSound(position);
-    }
-
-    private IEnumerator LightningBurstCoroutine(Vector3 target, NPC npc, Vector3 origin)
-    {
-        for (int i = 0; i < LightningBoltCount; i++)
-        {
-            CreateLightningBolt(origin, target);
-            if (i < LightningBoltCount - 1)
-                yield return new WaitForSeconds(LightningBoltInterval);
-        }
-
-        // Clear electrified effect after 4 seconds
-        yield return new WaitForSeconds(4f);
-        if (npc != null && npc.Avatar != null)
-            Electrifying.ClearFromAvatar(npc.Avatar);
-    }
-
-    private static void CreateLightningBolt(Vector3 start, Vector3 end)
-    {
-        var boltGo = new GameObject("ThorLightningBolt");
-        var lr = boltGo.AddComponent<LineRenderer>();
-
-        var shader = Shader.Find("Sprites/Default");
-        if (shader == null) shader = Shader.Find("UI/Default");
-        var mat = new Material(shader);
-        mat.color = new Color(0.6f, 0.75f, 1f, 1f);
-        lr.material = mat;
-
-        lr.startWidth = 0.2f;
-        lr.endWidth = 0.06f;
-        lr.shadowCastingMode = ShadowCastingMode.Off;
-        lr.receiveShadows = false;
-
-        int segments = 14;
-        lr.positionCount = segments + 1;
-
-        for (int i = 0; i <= segments; i++)
-        {
-            float t = (float)i / segments;
-            Vector3 pos = Vector3.Lerp(start, end, t);
-            if (i > 0 && i < segments)
-            {
-                pos.x += UnityEngine.Random.Range(-1.5f, 1.5f);
-                pos.y += UnityEngine.Random.Range(-0.5f, 0.5f);
-                pos.z += UnityEngine.Random.Range(-1.5f, 1.5f);
-            }
-            lr.SetPosition(i, pos);
-        }
-
-        UnityEngine.Object.Destroy(boltGo, 0.15f);
     }
 
     private void PlayThunderSound(Vector3 position)
