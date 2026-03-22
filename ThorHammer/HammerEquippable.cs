@@ -58,8 +58,6 @@ public class HammerEquippable : Equippable_Viewmodel
     // ── Lightning zap ──
     private static float LightningRange => Core.MaxThrowRange * 0.7f;
     private const float LightningAimRadius = 0.5f;
-    private const int LightningBoltCount = 12;
-    private const float LightningBoltInterval = 0.08f;
 
     // ── Flight ──
     private const float FlightGracePeriod = 0.5f;
@@ -590,10 +588,6 @@ public class HammerEquippable : Equippable_Viewmodel
     private void TryLightningZap()
     {
         var cam = PlayerSingleton<PlayerCamera>.Instance;
-        Vector3 hammerTip = _hammerModel != null
-            ? _hammerModel.transform.position + _hammerModel.transform.up * 0.3f
-            : cam.transform.position + cam.transform.forward * 0.5f;
-
         Vector3 targetPoint;
         NPC npc = null;
 
@@ -627,7 +621,9 @@ public class HammerEquippable : Equippable_Viewmodel
             targetPoint = cam.transform.position + cam.transform.forward * LightningRange;
         }
 
-        MelonCoroutines.Start(LightningHelper.BurstCoroutine(targetPoint, npc, hammerTip, LightningBoltCount, LightningBoltInterval));
+        LightningHelper.StrikeLightning(targetPoint);
+        if (npc != null)
+            MelonCoroutines.Start(LightningHelper.ClearElectrifyCoroutine(npc));
         PlayThunderSound(targetPoint);
         EmitLightningNoise(targetPoint);
         Player.Local.VisualState.ApplyState("melee_attack", EVisualState.Brandishing, 2.5f);
@@ -638,7 +634,8 @@ public class HammerEquippable : Equippable_Viewmodel
     private void StrikeLightningOnNPC(NPC npc)
     {
         Vector3 position = npc.transform.position;
-        MelonCoroutines.Start(LightningHelper.BurstCoroutine(position, npc, position + Vector3.up * 80f, LightningBoltCount, LightningBoltInterval));
+        LightningHelper.StrikeLightning(position);
+        MelonCoroutines.Start(LightningHelper.ClearElectrifyCoroutine(npc));
         Electrifying.ApplyToAvatar(npc.Avatar);
         PlayThunderSound(position);
         EmitLightningNoise(position);

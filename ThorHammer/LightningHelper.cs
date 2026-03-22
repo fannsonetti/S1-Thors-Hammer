@@ -1,14 +1,16 @@
 #if IL2CPP
 using Il2CppScheduleOne.Effects;
 using Il2CppScheduleOne.NPCs;
+using Il2CppScheduleOne.Weather;
 #else
 using ScheduleOne.Effects;
 using ScheduleOne.NPCs;
+using ScheduleOne.Weather;
 #endif
 
+using MelonLoader;
 using System.Collections;
 using UnityEngine;
-using UnityEngine.Rendering;
 
 namespace ThorHammer;
 
@@ -18,53 +20,109 @@ namespace ThorHammer;
 /// </summary>
 internal static class LightningHelper
 {
-    internal static IEnumerator BurstCoroutine(Vector3 target, NPC npc, Vector3 origin,
-        int boltCount, float interval)
-    {
-        for (int i = 0; i < boltCount; i++)
-        {
-            CreateBolt(origin, target);
-            if (i < boltCount - 1)
-                yield return new WaitForSeconds(interval);
-        }
+    private static VFXEffectHandler _lightningVFX;
+    private static bool _searched;
 
+    /// <summary>Clears the electrify effect from an NPC after a delay.</summary>
+    internal static IEnumerator ClearElectrifyCoroutine(NPC npc)
+    {
         yield return new WaitForSeconds(4f);
         if (npc != null && npc.Avatar != null)
             Electrifying.ClearFromAvatar(npc.Avatar);
     }
 
-    internal static void CreateBolt(Vector3 start, Vector3 end)
+    /// <summary>Strikes the game's real lightning VFX at the given position.</summary>
+    internal static void StrikeLightning(Vector3 position)
     {
-        var boltGo = new GameObject("ThorLightningBolt");
-        var lr = boltGo.AddComponent<LineRenderer>();
+        EnsureVFX();
+        if (_lightningVFX == null) return;
+        _lightningVFX.SetPosition(position);
+        _lightningVFX.Activate();
+        _lightningVFX.DelayDeactivate(2f);
+    }
 
-        var shader = Shader.Find("Sprites/Default");
-        if (shader == null) shader = Shader.Find("UI/Default");
-        var mat = new Material(shader);
-        mat.color = new Color(0.6f, 0.75f, 1f, 1f);
-        lr.material = mat;
+    /// <summary>
+    /// Lazily finds and clones the Lightning VFXEffectHandler from the game's
+    /// ThunderController. The clone lives in a standalone active hierarchy
+    /// (DontDestroyOnLoad) so it renders even when there is no active storm.
+    /// </summary>
+    private static void EnsureVFX()
+    {
+        if (_searched) return;
+        _searched = true;
 
-        lr.startWidth = 0.2f;
-        lr.endWidth = 0.06f;
-        lr.shadowCastingMode = ShadowCastingMode.Off;
-        lr.receiveShadows = false;
+        // Search all ThunderControllers including inactive/dormant weather volumes
+        var all = Resources.FindObjectsOfTypeAll<ThunderController>();
+        ThunderController tc = all.Length > 0 ? all[0] : null;
 
-        int segments = 14;
-        lr.positionCount = segments + 1;
-
-        for (int i = 0; i <= segments; i++)
+        if (tc == null)
         {
-            float t = (float)i / segments;
-            Vector3 pos = Vector3.Lerp(start, end, t);
-            if (i > 0 && i < segments)
-            {
-                pos.x += UnityEngine.Random.Range(-1.5f, 1.5f);
-                pos.y += UnityEngine.Random.Range(-0.5f, 0.5f);
-                pos.z += UnityEngine.Random.Range(-1.5f, 1.5f);
-            }
-            lr.SetPosition(i, pos);
+            Melon<Core>.Logger.Warning("No ThunderController found — lightning VFX unavailable");
+            return;
         }
 
-        UnityEngine.Object.Destroy(boltGo, 0.15f);
+        // Find the original Lightning VFXEffectHandler.
+        // _lightningEffect is null when Awake() hasn't run (no storm active),
+        // so also search the serialized visualEffects list.
+        VFXEffectHandler original = null;
+#if IL2CPP
+        original = tc._lightningEffect;
+        if (original == null && tc.visualEffects != null)
+        {
+            foreach (var vfx in tc.visualEffects)
+            {
+                if (vfx != null && vfx.Id == "Lightning")
+                {
+                    original = vfx;
+                    break;
+                }
+            }
+        }
+#else
+        var field = typeof(ThunderController).GetField("_lightningEffect",
+            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+        original = field?.GetValue(tc) as VFXEffectHandler;
+        if (original == null)
+        {
+            var listField = typeof(WeatherEffectController).GetField("visualEffects",
+                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            if (listField?.GetValue(tc) is System.Collections.IList list)
+            {
+                foreach (var item in list)
+                {
+                    if (item is VFXEffectHandler vfx && vfx.Id == "Lightning")
+                    {
+                        original = vfx;
+                        break;
+                    }
+                }
+            }
+        }
+#endif
+
+        if (original == null)
+        {
+            Melon<Core>.Logger.Warning("No lightning VFX found on ThunderController");
+            return;
+        }
+
+        // Clone into a standalone active hierarchy so Activate() actually renders.
+        // The original sits under ThunderController which is inactive when there's no storm.
+        var clone = UnityEngine.Object.Instantiate(original.gameObject);
+        clone.name = "ThorLightningVFX";
+        clone.SetActive(true);
+        UnityEngine.Object.DontDestroyOnLoad(clone);
+
+        _lightningVFX = clone.GetComponent<VFXEffectHandler>();
+        if (_lightningVFX != null)
+        {
+            _lightningVFX.Deactivate();
+            Melon<Core>.Logger.Msg("Cloned game lightning VFX for ThorHammer.");
+        }
+        else
+        {
+            Melon<Core>.Logger.Warning("Cloned lightning VFX has no VFXEffectHandler component");
+            UnityEngine.Object.Destroy(clone);
+        }
     }
 }
