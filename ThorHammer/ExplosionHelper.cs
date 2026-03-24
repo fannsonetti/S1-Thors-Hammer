@@ -17,15 +17,16 @@ internal static class ExplosionHelper
     private static Texture2D _debrisTexture;
     private static Material _debrisMaterial;
 
-    /// <summary>Plays ground impact VFX: shockwave ring, procedural explosion, and debris. Position is 0.9 units below player. Size scales with landing speed and effectMultiplier.</summary>
-    internal static void PlayGroundImpactVFX(Vector3 position, float landingSpeed, float effectMultiplier = 1f)
+    /// <summary>Plays ground impact VFX. slamRadiusWorld should match gameplay OverlapSphere radius so the ring reads at attack size.</summary>
+    internal static void PlayGroundImpactVFX(Vector3 position, float landingSpeed, float effectMultiplier = 1f, float slamRadiusWorld = 8f)
     {
-        float scale = Mathf.Clamp(landingSpeed / 18f, 0.6f, 4f) * effectMultiplier;
-        float shockwaveSize = 4f * scale;
+        float radiusVisual = Mathf.Clamp(slamRadiusWorld * 1.4f, 5f, 140f) * effectMultiplier;
+        float debrisScale = Mathf.Clamp(slamRadiusWorld / 8f, 0.5f, 8f) * effectMultiplier;
+        float speedBlend = Mathf.Clamp01((landingSpeed - 12f) / 88f);
 
-        PlayShockwaveRing(position, shockwaveSize, scale);
-        PlayProceduralExplosion(position, landingSpeed);
-        PlayDebris(position, scale);
+        PlayShockwaveRing(position, radiusVisual, debrisScale + speedBlend * 0.35f);
+        PlayProceduralExplosion(position, landingSpeed, radiusVisual, effectMultiplier);
+        PlayDebris(position, Mathf.Max(debrisScale, 0.4f));
     }
 
     private static void PlayShockwaveRing(Vector3 position, float maxSize, float scale)
@@ -52,10 +53,10 @@ internal static class ExplosionHelper
         }
     }
 
-    private static void PlayProceduralExplosion(Vector3 position, float landingSpeed)
+    private static void PlayProceduralExplosion(Vector3 position, float landingSpeed, float radiusVisual, float effectMultiplier)
     {
-        float explosionScale = Mathf.Clamp(landingSpeed / 18f, 0.6f, 8f);
-        float maxSize = 2.8f * explosionScale;
+        float explosionScale = Mathf.Clamp(radiusVisual * 0.22f * effectMultiplier, 1.2f, 28f);
+        float maxSize = Mathf.Lerp(explosionScale, explosionScale * 1.15f, Mathf.Clamp01((landingSpeed - 18f) / 82f));
         var go = new GameObject("ThorGroundSlamExplosion");
         go.transform.position = position;
         go.transform.rotation = Quaternion.Euler(-90f, 0f, 0f);

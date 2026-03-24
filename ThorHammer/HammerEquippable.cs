@@ -53,10 +53,14 @@ public class HammerEquippable : Equippable_Viewmodel
     private const float SwingDuration = 0.15f;
     private const float SwingAngle = 70f;
     private const float HitTime = 0.06f;
-    // Punch charging (hold left-click): hammer rotates back, then swings down
-    private const float PunchChargeDuration = 0.18f;      // Short charge window
-    private const float PunchChargeHammerAngle = -35f;    // Hammer rotates backward (wind-up)
-    private const float PunchReleaseDuration = 0.12f;     // Time to swing down and hit
+    // Punch: viewmodel wind-up; camera tilt on PlayerCamera.Camera (after game LateUpdate, see Harmony patch)
+    private const float PunchChargeDuration = 0.18f;
+    private const float PunchChargeHammerAngle = -36f;
+    private const float PunchReleaseDuration = 0.22f;
+    private const float PunchCamYawRight = 7.5f;      // stronger top-right feeling
+    private const float PunchCamPitchUp = -6.1f;      // look up is negative pitch in Unity
+    private const float PunchCamPitchDown = 6.8f;     // release dip
+    private const float PunchCamSmoothTime = 0.045f;
 
     // ── Wind-up (right-click hold) ──
     private const float WindUpMaxSpinSpeed = 2000f;
@@ -105,6 +109,12 @@ public class HammerEquippable : Equippable_Viewmodel
     private float _punchChargeElapsed;
     private bool _punchReleasing;
     private float _punchReleaseElapsed;
+    private Vector3 _punchCamRotSmoothed;
+    private Vector3 _punchCamRotVel;
+    private Vector3 _punchCamRotApplied;
+
+    /// <summary>Equipped hammer instance — punch camera runs after PlayerCamera.LateUpdate via Harmony.</summary>
+    internal static HammerEquippable ActiveInstance { get; private set; }
 
     // Model
     private GameObject _hammerModel;
@@ -183,11 +193,15 @@ public class HammerEquippable : Equippable_Viewmodel
 #else
         base.Equip(item);
 #endif
+        ActiveInstance = this;
     }
 
     /// <inheritdoc />
     public override void Unequip()
     {
+        if (ActiveInstance == this)
+            ActiveInstance = null;
+        ClearPunchCameraOffset();
         if (_state == HammerState.Flying)
             StopFlight(false);
         if (_state == HammerState.WindingUp)
@@ -364,6 +378,24 @@ public class HammerEquippable : Equippable_Viewmodel
         }
     }
 
+    /// <summary>Called from Harmony postfix after PlayerCamera.LateUpdate (bob + reset already applied).</summary>
+    internal static void ApplyPunchCameraAfterGameLateUpdate(PlayerCamera pc)
+    {
+        // Reverted per request: no extra punch camera motion.
+    }
+
+    private void ApplyPunchCameraToChild(PlayerCamera pc)
+    {
+        // Reverted per request: no extra punch camera motion.
+    }
+
+    private void ClearPunchCameraOffset()
+    {
+        _punchCamRotSmoothed = Vector3.zero;
+        _punchCamRotVel = Vector3.zero;
+        _punchCamRotApplied = Vector3.zero;
+    }
+
     private void LateUpdate()
     {
         if (_state == HammerState.Flying)
@@ -447,7 +479,7 @@ public class HammerEquippable : Equippable_Viewmodel
     }
 
     // ════════════════════════════════════════════
-    //  PUNCH CHARGING (hold → camera top-right, release → swing down)
+    //  PUNCH CHARGING (hold: camera tilts top-right; release: dips down then resets)
     // ════════════════════════════════════════════
 
     private void StartPunchCharge()
@@ -472,7 +504,13 @@ public class HammerEquippable : Equippable_Viewmodel
         float t = Mathf.Clamp01(_punchChargeElapsed / PunchChargeDuration);
         var chargeModel = ActiveHammerModel ?? _hammerModel;
         if (chargeModel != null)
-            chargeModel.transform.localRotation = Quaternion.Euler(t * PunchChargeHammerAngle, 0f, 0f) * _modelBaseRotation;
+        {
+            // Pull back/right a bit to feel like shoulder+arm loading up, not only wrist.
+            Vector3 chargePos = _hammerModelBasePos + new Vector3(0.04f * t, -0.02f * t, -0.07f * t);
+            float yaw = Mathf.Lerp(0f, 16f, t);
+            chargeModel.transform.localPosition = chargePos;
+            chargeModel.transform.localRotation = Quaternion.Euler(t * PunchChargeHammerAngle, yaw, 0f) * _modelBaseRotation;
+        }
     }
 
     private void UpdatePunchRelease()
@@ -484,8 +522,17 @@ public class HammerEquippable : Equippable_Viewmodel
         var swingModel = ActiveHammerModel ?? _hammerModel;
         if (swingModel != null)
         {
-            float angle = Mathf.Lerp(PunchChargeHammerAngle, 0f, smoothT) + Mathf.Sin(t * Mathf.PI) * SwingAngle;
-            swingModel.transform.localRotation = Quaternion.Euler(angle, 0f, 0f) * _modelBaseRotation;
+            float strike = Mathf.Sin(t * Mathf.PI);
+            Vector3 chargePos = _hammerModelBasePos + new Vector3(0.04f, -0.02f, -0.07f);
+            Vector3 impactPos = _hammerModelBasePos + new Vector3(-0.1f, -0.05f, 0.1f);
+            if (t < 0.72f)
+                swingModel.transform.localPosition = Vector3.Lerp(chargePos, impactPos, t / 0.72f);
+            else
+                swingModel.transform.localPosition = Vector3.Lerp(impactPos, _hammerModelBasePos, (t - 0.72f) / 0.28f);
+
+            float angle = Mathf.Lerp(PunchChargeHammerAngle, 8f, smoothT) + strike * (SwingAngle + 12f);
+            float yaw = Mathf.Lerp(16f, -34f, smoothT) + strike * 6f;
+            swingModel.transform.localRotation = Quaternion.Euler(angle, yaw, 0f) * _modelBaseRotation;
         }
 
         if (!_hitChecked && t >= 0.6f)
@@ -501,7 +548,10 @@ public class HammerEquippable : Equippable_Viewmodel
             _cooldownRemaining = SwingCooldown;
             var model = ActiveHammerModel ?? _hammerModel;
             if (model != null)
+            {
+                model.transform.localPosition = _hammerModelBasePos;
                 model.transform.localRotation = _modelBaseRotation;
+            }
         }
     }
 
@@ -572,7 +622,7 @@ public class HammerEquippable : Equippable_Viewmodel
 
         damageable.SendImpact(impact);
         Singleton<FXManager>.Instance.CreateImpactFX(impact, damageable);
-        PlayerSingleton<PlayerCamera>.Instance.StartCameraShake(0.12f, 0.15f);
+        PlayerSingleton<PlayerCamera>.Instance.StartCameraShake(0.14f, 0.12f);
 
         if (charged)
         {
@@ -999,8 +1049,9 @@ public class HammerEquippable : Equippable_Viewmodel
             }
             if (landingSpeed >= Core.FlightImpactMinSpeed)
             {
-                PlayGroundSlamEffects(playerPos, landingSpeed);
-                ExecuteGroundSlam(playerPos, landingSpeed);
+                float slamRadius = ComputeGroundSlamRadius(landingSpeed);
+                PlayGroundSlamEffects(playerPos, landingSpeed, slamRadius);
+                ExecuteGroundSlam(playerPos, landingSpeed, slamRadius);
             }
         }
 
@@ -1028,11 +1079,17 @@ public class HammerEquippable : Equippable_Viewmodel
             _chargedModel.transform.localRotation = _modelBaseRotation;
     }
 
-    private void PlayGroundSlamEffects(Vector3 position, float landingSpeed)
+    private static float ComputeGroundSlamRadius(float landingSpeed)
+    {
+        float speedRatio = landingSpeed / Core.FlightImpactMinSpeed;
+        return Mathf.Clamp(FlightImpactBaseRadius * speedRatio * Core.FlightImpactMultiplier, 2f, 50f);
+    }
+
+    private void PlayGroundSlamEffects(Vector3 position, float landingSpeed, float slamRadius)
     {
         PlayExplosionSound(position, landingSpeed);
         Vector3 groundPos = position + Vector3.down * 0.9f;
-        ExplosionHelper.PlayGroundImpactVFX(groundPos, landingSpeed, Core.FlightImpactMultiplier);
+        ExplosionHelper.PlayGroundImpactVFX(groundPos, landingSpeed, Core.FlightImpactMultiplier, slamRadius);
     }
 
     private void PlayExplosionSound(Vector3 position, float landingSpeed)
@@ -1090,17 +1147,36 @@ public class HammerEquippable : Equippable_Viewmodel
         }
         if (_explosionClip != null)
         {
-            float volume = Mathf.Clamp((landingSpeed - Core.FlightImpactMinSpeed) / 40f, 0.15f, 1f) * Core.FlightImpactMultiplier;
-            AudioSource.PlayClipAtPoint(_explosionClip, position, Mathf.Clamp01(volume));
+            float minS = Core.FlightImpactMinSpeed;
+            float spd = Mathf.Max(landingSpeed, minS);
+            // +1% volume per 1 m/s above min (capped), then round to 1% steps
+            float volume = Mathf.Clamp(0.1f + (spd - minS) * 0.01f, 0.1f, 1f) * Core.FlightImpactMultiplier;
+            volume = Mathf.Round(volume * 100f) / 100f;
+            float pitch = Mathf.Clamp(0.82f + (spd - minS) * 0.01f, 0.82f, 1.22f);
+            pitch = Mathf.Round(pitch * 100f) / 100f;
+            PlayExplosionOneShot(_explosionClip, position, Mathf.Clamp01(volume), pitch);
         }
     }
 
-    private void ExecuteGroundSlam(Vector3 center, float landingSpeed)
+    private static void PlayExplosionOneShot(AudioClip clip, Vector3 position, float volume, float pitch)
+    {
+        var go = new GameObject("ThorSlamExplosionAudio");
+        go.transform.position = position;
+        var src = go.AddComponent<AudioSource>();
+        src.clip = clip;
+        src.volume = volume;
+        src.pitch = Mathf.Clamp(pitch, 0.5f, 2f);
+        src.spatialBlend = 1f;
+        src.dopplerLevel = 0f;
+        src.Play();
+        float life = clip.length / Mathf.Max(0.05f, src.pitch) + 0.08f;
+        UnityEngine.Object.Destroy(go, life);
+    }
+
+    private void ExecuteGroundSlam(Vector3 center, float landingSpeed, float radius)
     {
         float speedRatio = landingSpeed / Core.FlightImpactMinSpeed;
-        float radius = Mathf.Clamp(FlightImpactBaseRadius * speedRatio * Core.FlightImpactMultiplier, 2f, 50f);
         float baseDamage = landingSpeed * 0.8f * Core.FlightImpactMultiplier;
-        // Knockback scales with slam intensity: gentle at low speed, strong at high speed (power curve)
         float forceMultiplier = Mathf.Pow(speedRatio, 1.5f) * Core.FlightImpactMultiplier;
         float baseForce = 80f * forceMultiplier;
 
@@ -1203,12 +1279,53 @@ public class HammerEquippable : Equippable_Viewmodel
 
         _chargeSettleElapsed = ChargeSettleDelay + ChargeSettleDuration;
         _hammerShakeElapsed = 1.5f;
+        TriggerHammerChargeLightningBurst();
 
         if (Player.Local != null)
         {
             var pos = Player.Local.transform.position;
             StrikeLightningOnPlayer(pos);
             PlayThunderSound(pos + Vector3.down * 1f);
+        }
+    }
+
+    private void TriggerHammerChargeLightningBurst()
+    {
+        var model = ActiveHammerModel ?? _chargedModel ?? _hammerModel;
+        if (model == null) return;
+        MelonCoroutines.Start(ChargeHammerLightningBurst(model.transform));
+    }
+
+    private IEnumerator ChargeHammerLightningBurst(Transform hammer)
+    {
+        if (hammer == null) yield break;
+        var cam = PlayerSingleton<PlayerCamera>.Instance;
+        var camT = cam != null ? cam.transform : null;
+
+        for (int i = 0; i < 4; i++)
+        {
+            if (hammer == null) yield break;
+            Vector3 target = hammer.position + new Vector3(
+                UnityEngine.Random.Range(-0.03f, 0.03f),
+                UnityEngine.Random.Range(-0.02f, 0.04f),
+                UnityEngine.Random.Range(-0.03f, 0.03f));
+            Vector3 from;
+            if (camT != null)
+            {
+                // Spawn bolt sources around/above the first-person hammer so they visibly converge into it.
+                float yaw = UnityEngine.Random.Range(-70f, 70f);
+                Vector3 lateral = Quaternion.Euler(0f, yaw, 0f) * camT.right;
+                from = target + camT.up * UnityEngine.Random.Range(0.75f, 1.25f) + lateral * UnityEngine.Random.Range(0.18f, 0.4f);
+            }
+            else
+            {
+                from = target + Vector3.up * UnityEngine.Random.Range(0.75f, 1.25f) +
+                       UnityEngine.Random.insideUnitSphere * 0.35f;
+            }
+            LightningHelper.ShootBoltFromTo(from, target);
+
+            if (i < 3)
+                yield return new WaitForSeconds(0.05f);
         }
     }
 
@@ -1251,8 +1368,6 @@ public class HammerEquippable : Equippable_Viewmodel
             ? (ActiveHammerModel ?? _hammerModel).transform.position
             : cam.transform.position + cam.transform.forward * 0.6f;
         LightningHelper.ShootBoltFromTo(hammerPos, targetPoint);
-        if (npc == null)
-            LightningHelper.StrikeLightning(targetPoint + Vector3.up * 1.5f);
         PlayThunderSound(targetPoint);
         if (Player.Local != null)
             PlayThunderSound(Player.Local.transform.position + Vector3.up * 0.5f);
